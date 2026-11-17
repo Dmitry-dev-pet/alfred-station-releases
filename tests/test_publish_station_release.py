@@ -104,7 +104,7 @@ class FakePublisher:
             assert payload['draft'] is True and payload['prerelease'] is False
             return {'id':555,'draft':True,'prerelease':False}
         if method=='PATCH':
-            assert payload=={'draft':False,'prerelease':False}
+            assert payload=={'tag_name':'v2026.11.16','draft':False,'prerelease':False}
             if self.patch_failure=='before':
                 raise p.Refused('github_http_403')
             self.draft=False
