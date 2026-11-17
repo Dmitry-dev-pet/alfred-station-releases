@@ -35,7 +35,9 @@ jobs:
           persist-credentials: false
       - name: Run fail-closed Python publisher tests without a write token
         run: python3 -m unittest discover -s tests -p 'test_publish_station_release.py' -v
-      - name: Reconstruct and hash-check exact public Git blobs without a write token
+      - name: Reconstruct and hash-check exact public Git blobs with read-only token
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: python3 scripts/publish_station_release.py verify
 
   publish:
