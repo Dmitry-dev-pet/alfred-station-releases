@@ -1,0 +1,103 @@
+{
+  "schema": "alfred-station-staging/v1",
+  "state": "unpublished",
+  "repository": "Dmitry-dev-pet/alfred-station-releases",
+  "source": "Dmitry-dev-pet/alfred-station",
+  "source_pr": 55,
+  "compiler": "go1.27.4",
+  "architecture": "linux/armv7-eabi5-static",
+  "asset": "station-armv7",
+  "asset_bytes": 6357116,
+  "asset_sha256": "e4969cf9ed7f9e4cea30dc50c22e48e65db09fb9a8755201f58a0d682264d8ff",
+  "transfer_encoding": "base64-text",
+  "chunk_chars": 524288,
+  "total_base64_chars": 8476156,
+  "chunks": [
+    {
+      "path": "payload/part-00.b64",
+      "git_blob_sha": "85252dcd153af0c73b98b68226afae1bfb5af0f2",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-01.b64",
+      "git_blob_sha": "5e98c55831c8699647a831b679e48a307d9c22f2",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-02.b64",
+      "git_blob_sha": "0cf5eef41fb21feeaddfd2a9e60c6f48eceee48e",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-03.b64",
+      "git_blob_sha": "581683e4cdc1be4d8c87bc4a184c1ee237bfeb0f",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-04.b64",
+      "git_blob_sha": "8fe448994ebf2df63a9e6c75bc46105768722e5d",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-05.b64",
+      "git_blob_sha": "59dd16ed72fc9c72a0bc15461c46e5134a41183c",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-06.b64",
+      "git_blob_sha": "3ae30c8f6dc298bbcab1524250e49227104e067a",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-07.b64",
+      "git_blob_sha": "723eb5a627fd8750e6a1e3bf46cb4d81de9ce2b9",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-08.b64",
+      "git_blob_sha": "69aae963800b49e13e2268d2a8446a9002c32e45",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-09.b64",
+      "git_blob_sha": "b7121b375e5bd62403d935d1472a723cb7739984",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-10.b64",
+      "git_blob_sha": "3aad7e3b1be6288049f9704acad5ad4a1da78367",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-11.b64",
+      "git_blob_sha": "bde94836680d3ea5f15ed7b24d072b5a07016276",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-12.b64",
+      "git_blob_sha": "6ba3fac78b752608521ae8310f1871186d0e026c",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-13.b64",
+      "git_blob_sha": "e0661cf5d3a9469495a87a7a6e1aa7aff432e936",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-14.b64",
+      "git_blob_sha": "4ae0824eef8a1abc549db6030f3bd9fdb9773388",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-15.b64",
+      "git_blob_sha": "9d4013683a8f19e2375296537273219ef7ed13c2",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-16.b64",
+      "git_blob_sha": "fc17784755e219f8290305599a7d248c710d7f9a",
+      "chars": 87548
+    }
+  ],
+  "notice": "Staged Git data only: no GitHub Release, no on-device installation. Publisher MUST reassemble, verify sha256 and perform a separately approved release."
+}
