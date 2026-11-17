@@ -21,7 +21,7 @@ permissions:
 jobs:
   tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,3 +30,6 @@ jobs:
         run: python3 -m py_compile scripts/publish_station_release.py tests/test_publish_station_release.py
       - name: Offline unit and negative tests (no GitHub write token)
         run: python3 -m unittest discover -s tests -p 'test_publish_station_release.py' -v
+      - name: Full public-stage readback for the owner PR only (NO write token)
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor == 'Dmitry-dev-pet' }}
+        run: python3 scripts/verify_staged_candidates.py
