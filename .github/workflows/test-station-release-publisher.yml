@@ -1,0 +1,32 @@
+name: Validate Alfred Station release publisher
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - '.github/workflows/**'
+      - 'README.md'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - '.github/workflows/**'
+      - 'README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Syntax check
+        run: python3 -m py_compile scripts/publish_station_release.py tests/test_publish_station_release.py
+      - name: Offline unit and negative tests (no GitHub write token)
+        run: python3 -m unittest discover -s tests -p 'test_publish_station_release.py' -v
