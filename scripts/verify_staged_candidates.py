@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Read-only acceptance: reconstruct both immutable public GitHub stages.
 
-This never loads a token, creates a Release, or talks to Station. For CI
-and owner-operated verification before any publisher workflow is approved.
+This never obtains a write token, creates a Release, or talks to Station.
+Uses only an optional same-repository read token to avoid API rate limits.
 """
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -13,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from publish_station_release import GitHubRead, RELEASES, verify_staging
 
 def main():
-    reader=GitHubRead()
+    reader=GitHubRead(token=os.environ.get('GITHUB_TOKEN',''))
     with tempfile.TemporaryDirectory(prefix='station-ci-stage-') as td:
         for tag, spec in RELEASES.items():
             output=Path(td)/('artifact-'+tag)
