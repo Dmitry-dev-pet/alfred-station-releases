@@ -362,7 +362,8 @@ def publish(pub,tag:str,size:int,digest:str,artifact:Path):
             if uploaded.get('name')!=name or uploaded.get('size')!=count or uploaded.get('digest')!='sha256:'+sha:
                 refuse('upload_proof_missing')
         readback=pub.json_request('GET',f'/repos/{REPO}/releases/{release_id}')
-        if readback.get('draft') is not True or readback.get('prerelease') is not False:
+        if (readback.get('draft') is not True or readback.get('prerelease') is not False or
+                readback.get('tag_name') != tag):
             refuse('release_readback_refused')
         _exact_asset_set(readback.get('assets'),expected)
         # The fallback may be removed or altered while this candidate uploads.
@@ -372,7 +373,8 @@ def publish(pub,tag:str,size:int,digest:str,artifact:Path):
         # GitHub may apply PATCH before its response is lost. Never call PATCH
         # twice. One read-only GET can positively reconcile a lost response.
         try:
-            pub.json_request('PATCH',f'/repos/{REPO}/releases/{release_id}',{'draft':False,'prerelease':False})
+            pub.json_request('PATCH',f'/repos/{REPO}/releases/{release_id}',
+                {'tag_name':tag,'draft':False,'prerelease':False})
         except Exception:
             # This includes a lost response after GitHub committed publication.
             # We do not claim failure or attempt a second publication.
@@ -400,7 +402,8 @@ def main():
         if (os.environ.get('GITHUB_EVENT_NAME')!='workflow_dispatch'
                 or os.environ.get('GITHUB_REF')!='refs/heads/main'
                 or os.environ.get('GITHUB_REPOSITORY')!=REPO
-                or os.environ.get('GITHUB_ACTOR')!=OWNER):
+                or os.environ.get('GITHUB_ACTOR')!=OWNER
+                or os.environ.get('GITHUB_TRIGGERING_ACTOR')!=OWNER):
             refuse('workflow_context_refused')
         event_file=Path(os.environ['GITHUB_EVENT_PATH'])
         if not event_file.is_file() or event_file.stat().st_size>100000:
