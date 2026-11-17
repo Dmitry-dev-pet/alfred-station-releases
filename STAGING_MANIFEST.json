@@ -1,0 +1,103 @@
+{
+  "schema": "alfred-station-staging/v1",
+  "state": "unpublished",
+  "repository": "Dmitry-dev-pet/alfred-station-releases",
+  "source": "Dmitry-dev-pet/alfred-station",
+  "source_pr": 60,
+  "compiler": "go1.27.4",
+  "architecture": "linux/armv7-eabi5-static",
+  "asset": "station-armv7",
+  "asset_bytes": 6357116,
+  "asset_sha256": "8b7b5b6ddc9057662f5d29125c01f8db24d16bb55eded94ac57ba666610165f0",
+  "transfer_encoding": "base64-text",
+  "chunk_chars": 524288,
+  "total_base64_chars": 8476156,
+  "chunks": [
+    {
+      "path": "payload/part-00.b64",
+      "git_blob_sha": "d3b666e192655e9c634347adc70fa0cc1f4eb44d",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-01.b64",
+      "git_blob_sha": "f2dce3a96d24ef0a2450c4f641244b7ffbaa1233",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-02.b64",
+      "git_blob_sha": "f2977cb5b0978bb785a52ee12febc14c3de23569",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-03.b64",
+      "git_blob_sha": "bbdf1d73500ca9e7589883ef4d252e2374b2deb5",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-04.b64",
+      "git_blob_sha": "461fab88ad2ce1f9435583ef5cd3c17e60abf154",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-05.b64",
+      "git_blob_sha": "91f86d10689bbb2a8710d156e492cb51a8bd7a10",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-06.b64",
+      "git_blob_sha": "dedef1f607924b3f886d9261b76bf0a0ea8622cf",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-07.b64",
+      "git_blob_sha": "a03f0aa57fe072e2c79058e5a5b48b968cd87e7f",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-08.b64",
+      "git_blob_sha": "394dd93ee07bd6290a0fed27351516f867e51b45",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-09.b64",
+      "git_blob_sha": "3424075d9cd4ea7fdf4c7830c8f0e5bff35313ec",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-10.b64",
+      "git_blob_sha": "4fffe63ee86c80f5e6c4d16996840239ae5dc752",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-11.b64",
+      "git_blob_sha": "615688e3380577f34ee1751cfbea2e0aa8b99bfd",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-12.b64",
+      "git_blob_sha": "eb84d34b298567b7f5b23d8ba452325a9b5a43bd",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-13.b64",
+      "git_blob_sha": "78dcad849517e0a836a0559643ff385e628171aa",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-14.b64",
+      "git_blob_sha": "57bfeca1e181e79d8668cd3b79ea92b65cc14c8d",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-15.b64",
+      "git_blob_sha": "83f8839b91d04944748c15773fd03032b4344389",
+      "chars": 524288
+    },
+    {
+      "path": "payload/part-16.b64",
+      "git_blob_sha": "dfab32637670310fd10870f9d4da97b07152e9db",
+      "chars": 87548
+    }
+  ],
+  "notice": "Git-only staging; actual Release requires owner-approved publisher and fresh hash checks."
+}
