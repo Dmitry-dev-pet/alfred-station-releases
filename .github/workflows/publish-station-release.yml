@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   verify:
-    if: ${{ github.actor == 'Dmitry-dev-pet' && github.repository == 'Dmitry-dev-pet/alfred-station-releases' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.actor == 'Dmitry-dev-pet' && github.triggering_actor == 'Dmitry-dev-pet' && github.repository == 'Dmitry-dev-pet/alfred-station-releases' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -35,14 +35,14 @@ jobs:
           persist-credentials: false
       - name: Run fail-closed Python publisher tests without a write token
         run: python3 -m unittest discover -s tests -p 'test_publish_station_release.py' -v
-      - name: Reconstruct and hash-check exact public Git blobs with read-only token
+      - name: Independently reconstruct BOTH pinned binaries without write token
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: python3 scripts/publish_station_release.py verify
+        run: python3 scripts/verify_staged_candidates.py
 
   publish:
     needs: verify
-    if: ${{ github.actor == 'Dmitry-dev-pet' && github.repository == 'Dmitry-dev-pet/alfred-station-releases' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.actor == 'Dmitry-dev-pet' && github.triggering_actor == 'Dmitry-dev-pet' && github.repository == 'Dmitry-dev-pet/alfred-station-releases' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
