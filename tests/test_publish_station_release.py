@@ -326,7 +326,10 @@ class ReleaseTests(unittest.TestCase):
                              'digest':'sha256:'+old['sha256']},
                             {'name':p.MANIFEST_ASSET,'size':len(manifest),
                              'digest':'sha256:'+hashlib.sha256(manifest).hexdigest()}]}
-                return super().json_request(method,path,payload,absent_ok=absent_ok)
+                response=super().json_request(method,path,payload,absent_ok=absent_ok)
+                if method=='GET' and path.endswith('/releases/555') and isinstance(response,dict):
+                    return {**response,'tag_name':'v2026.11.17'}
+                return response
         with tempfile.TemporaryDirectory() as tmp:
             artifact=Path(tmp)/'elf';artifact.write_bytes(fake_elf())
             publisher=VanishingFallback()
