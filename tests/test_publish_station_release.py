@@ -72,7 +72,8 @@ def event(opts=None):
 
 class FakePublisher:
     def __init__(self,fail_digest=False,old_tag=False,fail_manifest=False,missing_manifest=False,
-                 extra_asset=False,patch_failure=None,fail_final_get=False):
+                 extra_asset=False,patch_failure=None,fail_final_get=False,
+                 existing_draft_tag=False,list_full_pages=False):
         self.calls=[]
         self.fail_digest=fail_digest
         self.old_tag=old_tag
@@ -81,14 +82,24 @@ class FakePublisher:
         self.extra_asset=extra_asset
         self.patch_failure=patch_failure
         self.fail_final_get=fail_final_get
+        self.existing_draft_tag=existing_draft_tag
+        self.list_full_pages=list_full_pages
         self.draft=True
         self.assets=[]
         self.manifest_body=None
 
     def json_request(self,method,path,payload=None,*,absent_ok=False):
         self.calls.append((method,path))
-        if method=='GET' and (path.endswith('/releases/tags/v2026.11.16') or path.endswith('/git/ref/tags/v2026.11.16')):
-            return {'id':1} if self.old_tag else None
+        if method=='GET' and '/releases?per_page=100&page=' in path:
+            if self.existing_draft_tag:
+                return [{'tag_name':'v2026.11.16','draft':True}]
+            if self.list_full_pages:
+                return [{'tag_name':'v1.0.0'}]*100
+            return []
+        if method=='GET' and ('/releases/tags/' in path or '/git/ref/tags/' in path):
+            if self.old_tag and path.endswith('/v2026.11.16'):
+                return {'id':1}
+            return None
         if method=='POST':
             assert payload['draft'] is True and payload['prerelease'] is False
             return {'id':555,'draft':True,'prerelease':False}
@@ -201,7 +212,7 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(pub.manifest_body,p.stable_manifest('v2026.11.16',100,sha))
             self.assertEqual(pub.manifest_body.decode(),
                 f'ALFRED_STATION_STABLE_V1\ntag=v2026.11.16\nsize=100\nsha256={sha}\n')
-            self.assertEqual([x[0] for x in pub.calls],['GET','GET','POST','UPLOAD','UPLOAD','GET','PATCH','GET'])
+            self.assertEqual([x[0] for x in pub.calls],['GET','GET','GET','POST','UPLOAD','UPLOAD','GET','PATCH','GET'])
             self.assertEqual([x[1] for x in pub.calls if x[0]=='UPLOAD'],[p.ASSET,p.MANIFEST_ASSET])
             self.assertEqual(pub.draft,False)
             self.assertEqual(list(Path(tmp).iterdir()),[art])
@@ -233,7 +244,7 @@ class ReleaseTests(unittest.TestCase):
             result=p.publish(publisher,'v2026.11.16',100,digest,artifact)
             self.assertEqual(result['state'],'PUBLISHED')
             self.assertEqual([x[0] for x in publisher.calls].count('PATCH'),1)
-            self.assertEqual([x[0] for x in publisher.calls].count('GET'),4)
+            self.assertEqual([x[0] for x in publisher.calls].count('GET'),5)
 
     def test_publish_unconfirmed_after_patch_is_explicitly_uncertain(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -264,6 +275,68 @@ class ReleaseTests(unittest.TestCase):
             exists=FakePublisher(old_tag=True)
             with self.assertRaises(p.Refused):p.publish(exists,'v2026.11.16',100,sha,art)
             self.assertNotIn('POST',[x[0] for x in exists.calls])
+
+    def test_existing_draft_and_truncated_release_list_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact=Path(tmp)/'elf'; artifact.write_bytes(fake_elf())
+            sha=hashlib.sha256(fake_elf()).hexdigest()
+            for flags,expected in (
+                ({'existing_draft_tag':True},'release_already_exists'),
+                ({'list_full_pages':True},'release_list_truncated'),
+            ):
+                with self.subTest(flags=flags):
+                    publisher=FakePublisher(**flags)
+                    with self.assertRaises(p.Refused) as raised:
+                        p.publish(publisher,'v2026.11.16',100,sha,artifact)
+                    self.assertEqual(str(raised.exception),expected)
+                    self.assertNotIn('POST',[x[0] for x in publisher.calls])
+                    self.assertNotIn('PATCH',[x[0] for x in publisher.calls])
+            # Listing query cannot be manipulated or used for other hosts/paths.
+            client=p.GitHubPublish('test-token-never-used')
+            for invalid in (
+                f'/repos/{p.REPO}/releases?per_page=101&page=1',
+                f'/repos/{p.REPO}/releases?per_page=100&page=11',
+                f'/repos/{p.REPO}/releases?per_page=100&page=1&after=xyz',
+                f'/repos/{p.REPO}/contents?per_page=100&page=1',
+            ):
+                with self.subTest(invalid=invalid),self.assertRaises(p.Refused):
+                    client.json_request('GET',invalid)
+
+    def test_candidate_fallback_removed_before_patch_remains_draft(self):
+        sha=hashlib.sha256(fake_elf()).hexdigest()
+        p.RELEASES['v2026.11.17']={
+            'commit':'6b134118aeb21286e773eb87c63ecdfcf43ee6d5',
+            'sha256':sha,'size':100}
+        class VanishingFallback(FakePublisher):
+            def __init__(self):
+                super().__init__()
+                self.fallback_reads=0
+            def json_request(self,method,path,payload=None,*,absent_ok=False):
+                if method=='GET' and path.endswith('/releases/tags/v2026.11.16'):
+                    self.calls.append((method,path))
+                    self.fallback_reads+=1
+                    if self.fallback_reads>1:
+                        return None
+                    old=p.RELEASES['v2026.11.16']
+                    manifest=p.stable_manifest('v2026.11.16',old['size'],old['sha256'])
+                    return {
+                        'tag_name':'v2026.11.16','draft':False,'prerelease':False,
+                        'assets':[
+                            {'name':p.ASSET,'size':old['size'],
+                             'digest':'sha256:'+old['sha256']},
+                            {'name':p.MANIFEST_ASSET,'size':len(manifest),
+                             'digest':'sha256:'+hashlib.sha256(manifest).hexdigest()}]}
+                return super().json_request(method,path,payload,absent_ok=absent_ok)
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact=Path(tmp)/'elf';artifact.write_bytes(fake_elf())
+            publisher=VanishingFallback()
+            with self.assertRaises(p.Refused) as raised:
+                p.publish(publisher,'v2026.11.17',100,sha,artifact)
+            self.assertEqual(str(raised.exception),'fallback_release_missing_or_unstable')
+            self.assertEqual(publisher.fallback_reads,2)
+            self.assertIn('POST',[x[0] for x in publisher.calls])
+            self.assertNotIn('PATCH',[x[0] for x in publisher.calls])
+            self.assertTrue(publisher.draft)
 
     def test_new_candidate_refuses_without_matching_published_baseline(self):
         with tempfile.TemporaryDirectory() as tmp:
