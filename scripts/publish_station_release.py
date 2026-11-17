@@ -203,7 +203,12 @@ class GitHubPublish:
         self.token=token
 
     def json_request(self, method:str, path:str, payload:dict|None=None, *, absent_ok=False):
-        if not path.startswith('/repos/'+REPO+'/') or '?' in path or '#' in path:
+        # Only one exact query is permitted: bounded, authenticated listing of
+        # drafts and published Releases to prevent duplicate draft tag creation.
+        list_query=re.fullmatch(r'/repos/'+re.escape(REPO)+
+            r'/releases\?per_page=100&page=(?:[1-9]|10)',path)
+        if (not path.startswith('/repos/'+REPO+'/') or '#' in path or
+                ('?' in path and not (method=='GET' and list_query))):
             refuse('api_path_refused')
         data=json.dumps(payload,separators=(',',':')).encode() if payload is not None else None
         req=urllib.request.Request('https://api.github.com'+path,data=data,method=method,headers={
@@ -287,6 +292,27 @@ def require_fallback_release(pub):
          MANIFEST_ASSET:(len(content),hashlib.sha256(content).hexdigest())})
 
 
+def refuse_existing_draft_or_release(pub,tag:str):
+    """Find existing draft as well as stable releases using the same auth token.
+
+    GitHub's tag lookup omits drafts, and drafts need not yet create refs.
+    Never silently re-create the same tag after an uncertain prior attempt.
+    """
+    for page in range(1,11):
+        entries=pub.json_request('GET',
+            f'/repos/{REPO}/releases?per_page=100&page={page}')
+        if not isinstance(entries,list) or len(entries)>100:
+            refuse('release_list_unverified')
+        for entry in entries:
+            if not isinstance(entry,dict) or not isinstance(entry.get('tag_name'),str):
+                refuse('release_list_unverified')
+            if entry['tag_name']==tag:
+                refuse('release_already_exists')
+        if len(entries)<100:
+            return
+    refuse('release_list_truncated')
+
+
 def publish(pub,tag:str,size:int,digest:str,artifact:Path):
     if tag not in RELEASES or RELEASES[tag]['size']!=size or RELEASES[tag]['sha256']!=digest:
         refuse('release_not_allowlisted')
@@ -300,6 +326,7 @@ def publish(pub,tag:str,size:int,digest:str,artifact:Path):
         refuse('release_already_exists')
     if pub.json_request('GET',f'/repos/{REPO}/git/ref/tags/{tag}',absent_ok=True) is not None:
         refuse('tag_already_exists')
+    refuse_existing_draft_or_release(pub,tag)
     if artifact.stat().st_size!=size or hashlib.sha256(artifact.read_bytes()).hexdigest()!=digest:
         refuse('artifact_changed_since_verification')
     inspect_elf(artifact)
@@ -327,6 +354,10 @@ def publish(pub,tag:str,size:int,digest:str,artifact:Path):
         if readback.get('draft') is not True or readback.get('prerelease') is not False:
             refuse('release_readback_refused')
         _exact_asset_set(readback.get('assets'),expected)
+        # The fallback may be removed or altered while this candidate uploads.
+        # Recheck it immediately before making the candidate public.
+        if tag=='v2026.11.17':
+            require_fallback_release(pub)
         # GitHub may apply PATCH before its response is lost. Never call PATCH
         # twice. One read-only GET can positively reconcile a lost response.
         try:
