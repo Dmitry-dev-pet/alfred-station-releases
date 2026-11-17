@@ -88,17 +88,28 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 class GitHubRead:
-    """Read public immutable blobs. No auth header, no redirects, no arbitrary hosts."""
-    def __init__(self, opener=None):
+    """Read immutable public blobs using at most the repository's Actions token.
+
+    The optional token affects GitHub API rate limits, not the immutable
+    source ref, allowed path, SHA1 Git blob pin or final SHA256 check.
+    """
+    def __init__(self, opener=None, token=''):
+        if token and (not isinstance(token,str) or len(token)>4096 or
+                      '\n' in token or '\r' in token):
+            refuse('stage_read_token_invalid')
         self.opener = opener or urllib.request.build_opener(NoRedirect)
+        self.token = token
 
     def read(self, ref: str, path: str) -> bytes:
         if not COMMIT_RE.fullmatch(ref) or not (path == 'STAGING_MANIFEST.json' or
                  re.fullmatch(r'payload/part-[0-9]{2}\.b64', path)):
             refuse('stage_path_refused')
         url = 'https://api.github.com/repos/' + REPO + '/contents/' + path + '?ref=' + ref
-        request = urllib.request.Request(url, headers={'Accept':'application/vnd.github+json',
-            'X-GitHub-Api-Version':'2026-03-10', 'User-Agent':'Alfred-Station-Publisher-Read/1.0'})
+        headers={'Accept':'application/vnd.github+json',
+            'X-GitHub-Api-Version':'2026-03-10', 'User-Agent':'Alfred-Station-Publisher-Read/1.0'}
+        if self.token:
+            headers['Authorization']='Bearer '+self.token
+        request=urllib.request.Request(url,headers=headers)
         try:
             with self.opener.open(request, timeout=30) as res:
                 if res.status != 200:
@@ -398,7 +409,7 @@ def main():
         artifact=Path(os.environ['RUNNER_TEMP'])/STAGED_NAME
         # Both jobs reconstruct and validate their own copy from immutable Git.
         # Nothing from an untrusted workflow artifact or external source is used.
-        result=verify_staging(GitHubRead(),spec,artifact)
+        result=verify_staging(GitHubRead(token=os.environ.get('GITHUB_TOKEN','')),spec,artifact)
         if sys.argv[1]=='publish':
             result=publish(GitHubPublish(os.environ.get('GITHUB_TOKEN','')),
                            spec['tag'],spec['size'],spec['sha256'],artifact)
