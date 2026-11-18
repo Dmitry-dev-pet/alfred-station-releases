@@ -413,9 +413,12 @@ class ReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             artifact=Path(tmp)/'elf';artifact.write_bytes(fake_elf())
             pub=FakePublisher()
+            # First clock sample allows draft creation; the second simulates
+            # time lost on uploads, and must refuse *before* the only PATCH.
+            clocks=iter((0,240))
             with self.assertRaises(p.DraftLeftUnpublished) as ctx:
                 p.publish(pub,'v2026.11.16',100,hashlib.sha256(fake_elf()).hexdigest(),
-                          artifact,deadline_epoch=100,clock=lambda:30)
+                          artifact,deadline_epoch=250,clock=lambda:next(clocks))
             self.assertEqual((ctx.exception.release_id,ctx.exception.tag),
                              (555,'v2026.11.16'))
             self.assertEqual([method for method,_ in pub.calls].count('PATCH'),0)
