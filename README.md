@@ -38,8 +38,8 @@ GitHub Releases are **not** installations on the physical speaker.
 
 | Tag | Stage commit | Size | SHA-256 |
 | --- | --- | ---: | --- |
-| `v2026.11.16` — previous installed status-only ELF, pending fresh Mac/ADB readback | `9d1526a7c0d4ed5be17782066dfef8f36a66c632` | 5,963,900 B | `71c544e083fee96487103ed60e51b92bf4844d8f2b42a3d9ff9f86464dc1e528` |
-| `v2026.11.17` — corrected PR #60 release/updater candidate, NOT installed | `6b134118aeb21286e773eb87c63ecdfcf43ee6d5` | 6,357,116 B | `8b7b5b6ddc9057662f5d29125c01f8db24d16bb55eded94ac57ba666610165f0` |
+| `v2026.11.16` — previous PR52 ELF, verified and backed up before the manual 18 Nov install | `9d1526a7c0d4ed5be17782066dfef8f36a66c632` | 5,963,900 B | `71c544e083fee96487103ed60e51b92bf4844d8f2b42a3d9ff9f86464dc1e528` |
+| `v2026.11.17` — PR60 native ELF installed manually 18 Nov; Release-aware supervisor NOT installed | `6b134118aeb21286e773eb87c63ecdfcf43ee6d5` | 6,357,116 B | `8b7b5b6ddc9057662f5d29125c01f8db24d16bb55eded94ac57ba666610165f0` |
 
 The baseline contains 16 staged Git blobs; the new candidate 17. Each
 stage manifest and every blob SHA have already been independently checked.
@@ -50,15 +50,20 @@ is **superseded and must never be published**.
 
 1. Review and approve this PR and read-only CI; merge only after the policy/
    security review of the new `contents: write` workflow.
-2. Confirm the current speaker's *installed* binary is really the exact
-   5,963,900-byte baseline SHA via the approved **read-only Mac/ADB**
-   [Station #57](https://github.com/Dmitry-dev-pet/alfred-station/issues/57)
+2. Confirm the *currently installed* 6,357,116-byte PR60 ELF SHA-256
+   `8b7b5b6ddc9057662f5d29125c01f8db24d16bb55eded94ac57ba666610165f0`
+   with current read-only Mac/ADB. The *previous* 5,963,900-byte PR52 ELF
+   was independently read back and privately backed up during the verified
+   [18 Nov manual install](https://github.com/Dmitry-dev-pet/alfred-station/issues/64#issuecomment-6973743715).
+   Adapt the stale expected hash in [Station #57](https://github.com/Dmitry-dev-pet/alfred-station/issues/57)
    and [TruthRail #414](https://github.com/Dmitry-dev-pet/truthrail/issues/414).
    Confirm real `/tmp` tmpfs, free RAM, UBIFS `/data` capacity and
    GitHub Release HTTPS/TLS with no changes on the speaker.
-3. Before exposing `v2026.11.17` as the automatic stable latest release,
-   finish the separate PR #60 integrated updater/voice/rollback hardware
-   acceptance. Do not install an unverified binary or enable auto-check.
+3. Before exposing `v2026.11.17` to automatic checks, complete the
+   **release-aware supervisor** hardware acceptance and recovery checks
+   in [Station #68](https://github.com/Dmitry-dev-pet/alfred-station/issues/68).
+   The existing manual install used a *transition supervisor* only;
+   neither auto-check nor release rollback is active.
 4. After those gates, the owner goes to **Actions → Publish verified Alfred
    Station release → Run workflow**, chooses `v2026.11.16` first and types
    the exact confirmation string. Download and independently verify its
