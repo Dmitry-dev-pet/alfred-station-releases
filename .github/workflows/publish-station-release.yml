@@ -44,11 +44,13 @@ jobs:
     needs: verify
     if: ${{ github.actor == 'Dmitry-dev-pet' && github.triggering_actor == 'Dmitry-dev-pet' && github.repository == 'Dmitry-dev-pet/alfred-station-releases' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # The publisher uses an 8-minute internal cap from its first step;
+    # extra job time also covers runner preparation and final reporting.
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
-      # 10-minute job; reserve >=120 seconds for PATCH and final readback.
+      # Publish job internally budgets 8 minutes, with bounded final PATCH/GET.
       - name: Record publisher job start before network-bound steps
         run: echo "STATION_PUBLISH_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
