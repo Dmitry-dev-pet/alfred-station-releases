@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import tempfile
 import stat
 import struct
@@ -60,6 +61,33 @@ class DraftLeftUnpublished(Exception):
         self.release_id = release_id
         self.tag = tag
         super().__init__('publication_window_exhausted')
+
+
+class RequestWalltimeExceeded(Exception):
+    """Whole-request timeout, including a trickling response body."""
+
+
+def with_hard_deadline(request, seconds: float):
+    """Bound a whole network operation, not just each socket read.
+
+    Production runs on a single-threaded Ubuntu Actions Python process.
+    SIGALRM is never used for release uploads or other non-idempotent steps.
+    """
+    if not hasattr(signal,'setitimer') or not hasattr(signal,'SIGALRM'):
+        refuse('publisher_walltime_guard_missing')
+    old_timer=signal.getitimer(signal.ITIMER_REAL)
+    if old_timer[0]>0 or old_timer[1]>0:
+        refuse('publisher_walltime_guard_busy')
+    old_handler=signal.getsignal(signal.SIGALRM)
+    def abort(_signal,_frame):
+        raise RequestWalltimeExceeded('request_walltime_exceeded')
+    signal.signal(signal.SIGALRM,abort)
+    try:
+        signal.setitimer(signal.ITIMER_REAL,seconds)
+        return request()
+    finally:
+        signal.setitimer(signal.ITIMER_REAL,0)
+        signal.signal(signal.SIGALRM,old_handler)
 
 
 def refuse(reason: str):
@@ -358,6 +386,10 @@ def publish(pub,tag:str,size:int,digest:str,artifact:Path, *, deadline_epoch=Non
         manifest_path.chmod(0o600)
         if manifest_path.stat().st_size!=len(manifest) or hashlib.sha256(manifest_path.read_bytes()).hexdigest()!=manifest_digest:
             refuse('stable_manifest_changed')
+        # Do not create an orphan draft if upload/readback cannot plausibly
+        # finish within the bounded job's remaining publication window.
+        if deadline_epoch is not None and deadline_epoch-clock()<180:
+            refuse('publication_window_too_short_for_draft')
         release=pub.json_request('POST',f'/repos/{REPO}/releases',{
             'tag_name':tag,'target_commitish':'main','name':'Alfred Station '+tag,
             'body':'One offline-built ARMv7 MCP tunnel-client. SHA-256: '+digest,
@@ -396,14 +428,19 @@ def publish(pub,tag:str,size:int,digest:str,artifact:Path, *, deadline_epoch=Non
         # GitHub may apply PATCH before its response is lost. Never call PATCH
         # twice. One read-only GET can positively reconcile a lost response.
         try:
-            pub.json_request('PATCH',f'/repos/{REPO}/releases/{release_id}',
+            do_patch=lambda: pub.json_request('PATCH',f'/repos/{REPO}/releases/{release_id}',
                 {'tag_name':tag,'draft':False,'prerelease':False})
+            if deadline_epoch is not None:
+                with_hard_deadline(do_patch,30)
+            else:
+                do_patch()
         except Exception:
             # This includes a lost response after GitHub committed publication.
             # We do not claim failure or attempt a second publication.
             pass
         try:
-            result=pub.json_request('GET',f'/repos/{REPO}/releases/{release_id}')
+            final_get=lambda: pub.json_request('GET',f'/repos/{REPO}/releases/{release_id}')
+            result=with_hard_deadline(final_get,30) if deadline_epoch is not None else final_get()
             if (not isinstance(result,dict) or
                     result.get('id')!=release_id or
                     result.get('draft') is not False or
