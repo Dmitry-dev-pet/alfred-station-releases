@@ -6,6 +6,7 @@ from pathlib import Path
 import struct
 import sys
 import tempfile
+import time
 import unittest
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -373,22 +374,38 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual([method for method,_ in pub.calls].count('PATCH'),1)
 
     def test_changed_draft_after_fallback_check_stays_unpublished(self):
-        class ChangedBeforePatch(FakePublisher):
+        digest=hashlib.sha256(fake_elf()).hexdigest()
+        p.RELEASES['v2026.11.17']={
+            'commit':'6b134118aeb21286e773eb87c63ecdfcf43ee6d5',
+            'sha256':digest,'size':100}
+        class ChangedCandidate(FakePublisher):
             def __init__(self):
                 super().__init__()
+                self.fallback_reads=0
                 self.draft_gets=0
             def json_request(self,method,path,payload=None,*,absent_ok=False):
+                if method=='GET' and path.endswith('/releases/tags/v2026.11.16'):
+                    self.calls.append((method,path))
+                    self.fallback_reads+=1
+                    old=p.RELEASES['v2026.11.16']
+                    manifest=p.stable_manifest('v2026.11.16',old['size'],old['sha256'])
+                    return {'tag_name':'v2026.11.16','draft':False,'prerelease':False,
+                        'assets':[
+                            {'name':p.ASSET,'size':old['size'],'digest':'sha256:'+old['sha256']},
+                            {'name':p.MANIFEST_ASSET,'size':len(manifest),
+                             'digest':'sha256:'+hashlib.sha256(manifest).hexdigest()}]}
                 response=super().json_request(method,path,payload,absent_ok=absent_ok)
                 if method=='GET' and path.endswith('/releases/555'):
                     self.draft_gets+=1
-                    if self.draft_gets==2:
+                    if self.draft_gets==2 and self.fallback_reads==2:
                         return {**response,'assets':response['assets'][:-1]}
                 return response
         with tempfile.TemporaryDirectory() as tmp:
             artifact=Path(tmp)/'elf';artifact.write_bytes(fake_elf())
-            pub=ChangedBeforePatch()
+            pub=ChangedCandidate()
             with self.assertRaises(p.Refused):
-                p.publish(pub,'v2026.11.16',100,hashlib.sha256(fake_elf()).hexdigest(),artifact)
+                p.publish(pub,'v2026.11.17',100,digest,artifact)
+            self.assertEqual(pub.fallback_reads,2)
             self.assertEqual(pub.draft_gets,2)
             self.assertEqual([method for method,_ in pub.calls].count('PATCH'),0)
 
@@ -403,6 +420,31 @@ class ReleaseTests(unittest.TestCase):
                              (555,'v2026.11.16'))
             self.assertEqual([method for method,_ in pub.calls].count('PATCH'),0)
             self.assertTrue(pub.draft)
+
+
+    def test_no_draft_if_publication_window_already_short(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact=Path(tmp)/'elf'; artifact.write_bytes(fake_elf())
+            pub=FakePublisher()
+            with self.assertRaises(p.Refused) as ctx:
+                p.publish(pub,'v2026.11.16',100,hashlib.sha256(fake_elf()).hexdigest(),
+                          artifact,deadline_epoch=100,clock=lambda:0)
+            self.assertEqual(str(ctx.exception),'publication_window_too_short_for_draft')
+            self.assertNotIn('POST',[x[0] for x in pub.calls])
+
+    def test_bounded_final_publication_calls(self):
+        # Real signal timeout applies across a trickling read, not per socket.
+        with self.assertRaises(p.RequestWalltimeExceeded):
+            p.with_hard_deadline(lambda: time.sleep(.15),.02)
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact=Path(tmp)/'elf';artifact.write_bytes(fake_elf())
+            pub=FakePublisher()
+            result=p.publish(pub,'v2026.11.16',100,
+                hashlib.sha256(fake_elf()).hexdigest(),artifact,
+                deadline_epoch=1000,clock=lambda:0)
+            self.assertEqual(result['state'],'PUBLISHED')
+            self.assertEqual([m for m,_ in pub.calls].count('PATCH'),1)
+
 
     def test_new_candidate_refuses_without_matching_published_baseline(self):
         with tempfile.TemporaryDirectory() as tmp:
