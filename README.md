@@ -32,6 +32,14 @@ GitHub publication request might have succeeded but its response was lost,
 the publisher performs one read-only reconciliation; an unresolved outcome
 is `PUBLICATION_UNCERTAIN` with exact release ID and tag, **never a retry**.
 
+While publishing the candidate, operators must **not edit, delete, redraft or replace**
+the published baseline Release/tag or candidate draft/assets by any other route.
+The workflow serializes its own runs, but GitHub's Release PATCH cannot provide
+a compare-and-swap against concurrent manual edits. Two final readbacks narrow
+that race; they cannot eliminate it. The publisher bounds its final PATCH and
+GET with whole-request timeouts and reports any indeterminate outcome without
+automatic retry.
+
 GitHub Releases are **not** installations on the physical speaker.
 
 ## Exact immutable candidate versions
