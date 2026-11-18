@@ -17,6 +17,7 @@ import tempfile
 import stat
 import struct
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -50,6 +51,15 @@ class PublicationUncertain(Exception):
         self.release_id = release_id
         self.tag = tag
         super().__init__('publication_requires_manual_readback')
+
+
+class DraftLeftUnpublished(Exception):
+    """A verified draft exists, but no publication PATCH was attempted."""
+
+    def __init__(self, release_id: int, tag: str):
+        self.release_id = release_id
+        self.tag = tag
+        super().__init__('publication_window_exhausted')
 
 
 def refuse(reason: str):
@@ -324,7 +334,7 @@ def refuse_existing_draft_or_release(pub,tag:str):
     refuse('release_list_truncated')
 
 
-def publish(pub,tag:str,size:int,digest:str,artifact:Path):
+def publish(pub,tag:str,size:int,digest:str,artifact:Path, *, deadline_epoch=None, clock=time.time):
     if tag not in RELEASES or RELEASES[tag]['size']!=size or RELEASES[tag]['sha256']!=digest:
         refuse('release_not_allowlisted')
     if tag=='v2026.11.17':
@@ -370,6 +380,19 @@ def publish(pub,tag:str,size:int,digest:str,artifact:Path):
         # Recheck it immediately before making the candidate public.
         if tag=='v2026.11.17':
             require_fallback_release(pub)
+        # Narrow the race after the fallback check by validating the exact
+        # draft identity/assets again immediately before the only PATCH.
+        # GitHub PATCH has no asset compare-and-swap; final readback is required.
+        prepatch=pub.json_request('GET',f'/repos/{REPO}/releases/{release_id}')
+        if (not isinstance(prepatch,dict) or prepatch.get('id')!=release_id
+                or prepatch.get('draft') is not True or prepatch.get('prerelease') is not False
+                or prepatch.get('tag_name')!=tag):
+            refuse('release_prepatch_readback_refused')
+        _exact_asset_set(prepatch.get('assets'),expected)
+        # The workflow reserves 120s beyond this limit. Stop before PATCH
+        # when less than 75s remain to reconcile uncertain publication.
+        if deadline_epoch is not None and deadline_epoch-clock()<75:
+            raise DraftLeftUnpublished(release_id,tag)
         # GitHub may apply PATCH before its response is lost. Never call PATCH
         # twice. One read-only GET can positively reconcile a lost response.
         try:
@@ -414,10 +437,22 @@ def main():
         # Nothing from an untrusted workflow artifact or external source is used.
         result=verify_staging(GitHubRead(token=os.environ.get('GITHUB_TOKEN','')),spec,artifact)
         if sys.argv[1]=='publish':
+            job_started_raw=os.environ.get('STATION_PUBLISH_JOB_STARTED_EPOCH','')
+            if not re.fullmatch(r'[0-9]{10}',job_started_raw):
+                refuse('publisher_job_clock_missing')
+            job_started=int(job_started_raw)
+            if not job_started<=time.time()<=job_started+600:
+                refuse('publisher_job_clock_invalid')
             result=publish(GitHubPublish(os.environ.get('GITHUB_TOKEN','')),
-                           spec['tag'],spec['size'],spec['sha256'],artifact)
+                           spec['tag'],spec['size'],spec['sha256'],artifact,
+                           deadline_epoch=job_started+480)
         print(json.dumps(result,sort_keys=True))
         return 0
+    except DraftLeftUnpublished as e:
+        print(json.dumps({'state':'DRAFT_NOT_PUBLISHED',
+            'code':'publication_window_exhausted',
+            'release_id':e.release_id,'tag':e.tag,'retry_allowed':False},sort_keys=True))
+        return 1
     except PublicationUncertain as e:
         print(json.dumps({'state':'PUBLICATION_UNCERTAIN',
             'code':'publication_requires_manual_readback',
