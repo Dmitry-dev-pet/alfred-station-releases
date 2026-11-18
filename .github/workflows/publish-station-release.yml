@@ -48,6 +48,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      # 10-minute job; reserve >=120 seconds for PATCH and final readback.
+      - name: Record publisher job start before network-bound steps
+        run: echo "STATION_PUBLISH_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
