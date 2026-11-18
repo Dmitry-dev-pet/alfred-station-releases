@@ -1,0 +1,37 @@
+name: Validate Alfred Station release publisher
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - '.github/workflows/**'
+      - 'README.md'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+      - 'tests/**'
+      - '.github/workflows/**'
+      - 'README.md'
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Syntax check
+        run: python3 -m py_compile scripts/publish_station_release.py tests/test_publish_station_release.py
+      - name: Offline unit and negative tests (no GitHub write token)
+        run: python3 -m unittest discover -s tests -p 'test_publish_station_release.py' -v
+      - name: Full public-stage readback for the owner PR only (NO write token)
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor == 'Dmitry-dev-pet' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/verify_staged_candidates.py

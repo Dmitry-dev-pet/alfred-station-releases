@@ -1,0 +1,62 @@
+name: Publish verified Alfred Station release
+
+# Explicit owner action, no issue-command, no scheduled publisher.
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Exact immutable release (baseline must be published first)
+        required: true
+        type: choice
+        options:
+          - v2026.11.16
+          - v2026.11.17
+      confirmation:
+        description: Enter HARDWARE-VERIFIED-PUBLISH only after preflight and human review
+        required: true
+        type: string
+
+# No implicit broad token, and never run a write job for a PR.
+permissions: {}
+concurrency:
+  group: alfred-station-release-publication
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: ${{ github.actor == 'Dmitry-dev-pet' && github.triggering_actor == 'Dmitry-dev-pet' && github.repository == 'Dmitry-dev-pet/alfred-station-releases' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run fail-closed Python publisher tests without a write token
+        run: python3 -m unittest discover -s tests -p 'test_publish_station_release.py' -v
+      - name: Independently reconstruct BOTH pinned binaries without write token
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/verify_staged_candidates.py
+
+  publish:
+    needs: verify
+    if: ${{ github.actor == 'Dmitry-dev-pet' && github.triggering_actor == 'Dmitry-dev-pet' && github.repository == 'Dmitry-dev-pet/alfred-station-releases' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    # The publisher uses an 8-minute internal cap from its first step;
+    # extra job time also covers runner preparation and final reporting.
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      # Publish job internally budgets 8 minutes, with bounded final PATCH/GET.
+      - name: Record publisher job start before network-bound steps
+        run: echo "STATION_PUBLISH_JOB_STARTED_EPOCH=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Independently verify the immutable SHA pin and publish two checked assets
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/publish_station_release.py publish
